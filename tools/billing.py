@@ -144,9 +144,45 @@ def get_draft_bill(bill_id):
              "name": i["product_name"]}
             for i in item_dicts
         ]) if item_dicts else None
-        return {"ok": True, "bill": dict(bill), "items": item_dicts, "tax_preview": tax}
+        receipt_text = None
+        if tax:
+            receipt_text = format_receipt(bill_id, bill["payment_mode"], tax, bill["payment_ref"])
+        return {"ok": True, "bill": dict(bill), "items": item_dicts, "tax_preview": tax,
+                "receipt_text": receipt_text}
     finally:
         conn.close()
+
+
+def format_receipt(bill_id, payment_mode, tax, payment_ref=None):
+    """Plain-text GST bill for Telegram — no markdown, no emoji."""
+    rows = [
+        "TAX INVOICE",
+        f"Bill no. {bill_id}",
+        "--------------------------------",
+    ]
+    for line in tax.get("lines") or []:
+        name = line.get("name") or line.get("product_name") or "Item"
+        qty = line["qty"]
+        rate = line["unit_price"]
+        total = line["line_total"]
+        gst = line.get("gst_rate") or 0
+        hsn = line.get("hsn_code") or "-"
+        rows.append(name)
+        rows.append(f"  {qty:g} x Rs {rate:.2f} = Rs {total:.2f}")
+        rows.append(f"  GST {gst:g}%  HSN {hsn}")
+    rows.append("--------------------------------")
+    rows.append(f"Taxable value     Rs {tax['subtotal_taxable']:.2f}")
+    rows.append(f"CGST              Rs {tax['total_cgst']:.2f}")
+    rows.append(f"SGST              Rs {tax['total_sgst']:.2f}")
+    if tax.get("round_off"):
+        rows.append(f"Round off         Rs {tax['round_off']:.2f}")
+    rows.append(f"Grand total       Rs {tax['grand_total']:.2f}")
+    rows.append("--------------------------------")
+    pay = (payment_mode or "-").upper()
+    rows.append(f"Payment: {pay}")
+    if payment_ref:
+        rows.append(f"Ref: {payment_ref}")
+    return "\n".join(rows)
 
 
 def finalize_bill(bill_id, payment_mode, payment_ref=None, idempotency_key=None, confirmed=False):
@@ -255,6 +291,7 @@ def _finalize_bill_inner(bill_id, payment_mode, payment_ref, idempotency_key, co
             "total_cgst": tax["total_cgst"],
             "total_sgst": tax["total_sgst"],
             "lines": tax["lines"],
+            "receipt_text": format_receipt(bill_id, payment_mode, tax, payment_ref),
         }
         save_idempotent(idempotency_key, "finalize_bill", result, conn=conn)
         return result

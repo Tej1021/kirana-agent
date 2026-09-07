@@ -36,10 +36,12 @@ def main():
             continue
 
         idempotency_seed = f"cli-{uuid.uuid4()}"
-        final_text, history = agent.run_turn(
+        final_text, history, generated_files = agent.run_turn(
             owner_id=OWNER_ID, user_message=text, history=history, idempotency_seed=idempotency_seed
         )
         print(f"agent> {final_text}\n")
+        for path in generated_files:
+            print(f"file> {path}")
 
 
 if __name__ == "__main__":

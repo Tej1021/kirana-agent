@@ -8,7 +8,7 @@ state, only the current conversation's scrollback.
 import os
 import logging
 from dotenv import load_dotenv
-from telegram import Update
+from telegram import InputFile, Update
 from telegram.error import NetworkError, TimedOut
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 from telegram.request import HTTPXRequest
@@ -32,7 +32,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "\"50 packets of Maggi came in, cost ₹12\"\n"
         "\"make a bill: 2kg sugar, 1 Aashirvaad atta 5kg, UPI\"\n"
         "\"put ₹500 on Ramesh's credit\"\n"
-        "\"today's sales?\"\n\n"
+        "\"today's sales?\"\n"
+        "\"send me that bill as a PDF\"\n"
+        "\"make this week's sales analysis deck\"\n\n"
+        "PDF invoices and PPTX decks are sent as downloadable files in this chat.\n"
         "/new clears this chat's scrollback (your store's data and your preferences stay)."
     )
 
@@ -55,7 +58,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     idempotency_seed = f"tg-{update.update_id}"
 
     try:
-        final_text, updated_history = agent.run_turn(
+        final_text, updated_history, generated_files = agent.run_turn(
             owner_id=owner_id,
             user_message=update.message.text,
             history=history,
@@ -70,23 +73,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(final_text or "(done)")
 
-    # If a tool call this turn produced a file (PDF/PPTX), send it.
-    for msg in updated_history[-4:]:
-        if msg["role"] != "user" or not isinstance(msg["content"], list):
+    for path in generated_files:
+        if not path or not os.path.exists(path):
             continue
-        for block in msg["content"]:
-            if block.get("type") != "tool_result":
-                continue
-            content = block.get("content", "")
-            if '"path"' in content and (".pdf" in content or ".pptx" in content):
-                import json as _json
-                try:
-                    parsed = _json.loads(content)
-                    path = parsed.get("path")
-                    if path and os.path.exists(path):
-                        await update.message.reply_document(document=open(path, "rb"))
-                except Exception:
-                    pass
+        filename = os.path.basename(path)
+        try:
+            with open(path, "rb") as f:
+                await update.message.reply_document(
+                    document=InputFile(f, filename=filename),
+                    caption=filename,
+                )
+        except Exception:
+            logging.exception("Failed to send document %s", path)
+            await update.message.reply_text(
+                f"Generated {filename} but couldn't attach it here. Saved at: {path}"
+            )
 
 
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):

@@ -38,13 +38,23 @@ with confirmed=true) if the owner explicitly agrees.
 - If a tool returns an error/refusal (oversell, unknown khata account, etc.), relay it plainly — do not \
 retry with different values to work around it.
 - Keep replies short and shopkeeper-practical, like a text message, not a report.
+- Never use markdown (no asterisks, no bold), never use emoji or icons. Plain text only.
+- When finalize_bill or get_draft_bill returns receipt_text, send that receipt to the owner \
+verbatim as the bill. Do not decorate it. You may add one plain line after it asking if they \
+want the invoice PDF.
+- When the owner asks for an invoice PDF or analysis deck, call generate_invoice_pdf / \
+generate_analysis_pptx. The bot will attach the file in Telegram — just confirm it is attached.
+- Reply in the language of the owner's latest message (Hindi, English, Tamil, mixed, etc.). \
+If they switch languages mid-chat, switch with them — do not keep using an earlier language \
+just because previous turns were in it. Do not save a language preference unless they \
+explicitly ask you to always use one.
 
 The owner's standing preferences (persisted across all chats):
 {preferences_block}
 """
 
 
-def _build_system_prompt(owner_id):
+def build_system_prompt(owner_id):
     prefs = prefs_module.get_all_preferences(owner_id)
     if prefs:
         block = "\n".join(f"- {k}: {v}" for k, v in prefs.items())
@@ -87,7 +97,7 @@ NEEDS_OWNER_ID = {
 }
 
 
-def _dispatch_tool(tool_name, tool_input, owner_id, idempotency_seed):
+def dispatch_tool(tool_name, tool_input, owner_id, idempotency_seed):
     fn = TOOL_DISPATCH.get(tool_name)
     if fn is None:
         return {"ok": False, "error": f"Unknown tool: {tool_name}"}
@@ -107,6 +117,16 @@ def _dispatch_tool(tool_name, tool_input, owner_id, idempotency_seed):
         return {"ok": False, "error": f"Internal error in {tool_name}: {e}"}
 
 
+def with_language_hint(user_message):
+    """Pin reply language to this turn so history in another language cannot stick."""
+    return (
+        f"{user_message}\n\n"
+        "[Reply in the same language as my message above. "
+        "If I wrote in English, reply in English — do not continue in Hindi "
+        "just because earlier messages were Hindi.]"
+    )
+
+
 def run_turn(owner_id, user_message, history, idempotency_seed):
     """
     owner_id: stable identity for the shop owner (Telegram user id)
@@ -115,10 +135,11 @@ def run_turn(owner_id, user_message, history, idempotency_seed):
              (cleared on /new — persistence of facts happens via the DB, not this list)
     idempotency_seed: unique per incoming update (e.g. f"tg-{update_id}"), used to
              derive idempotency keys for any mutating tool calls this turn triggers
-    Returns (final_text, updated_history)
+    Returns (final_text, updated_history, generated_files)
     """
-    system_prompt = _build_system_prompt(owner_id)
-    messages = history + [{"role": "user", "content": user_message}]
+    system_prompt = build_system_prompt(owner_id)
+    messages = history + [{"role": "user", "content": with_language_hint(user_message)}]
+    generated_files = []
 
     while True:
         response = client.messages.create(
@@ -135,13 +156,17 @@ def run_turn(owner_id, user_message, history, idempotency_seed):
             final_text = "".join(
                 block.text for block in response.content if block.type == "text"
             )
-            return final_text, messages
+            return final_text, messages, generated_files
 
         tool_results = []
         for block in response.content:
             if block.type != "tool_use":
                 continue
-            result = _dispatch_tool(block.name, block.input, owner_id, idempotency_seed)
+            result = dispatch_tool(block.name, block.input, owner_id, idempotency_seed)
+            if isinstance(result, dict) and result.get("ok") and result.get("path"):
+                path = result["path"]
+                if os.path.exists(path):
+                    generated_files.append(path)
             tool_results.append({
                 "type": "tool_result",
                 "tool_use_id": block.id,
@@ -149,4 +174,3 @@ def run_turn(owner_id, user_message, history, idempotency_seed):
             })
 
         messages.append({"role": "user", "content": tool_results})
-        # loop continues: feed results back, let the model act on them

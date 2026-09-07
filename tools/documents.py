@@ -6,10 +6,12 @@ placeholder text.
 """
 
 import os
-import tempfile
 
 from db import get_connection
 from tools import analytics, preferences
+
+ARTIFACTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "artifacts")
+os.makedirs(ARTIFACTS_DIR, exist_ok=True)
 
 
 def _register_rupee_font():
@@ -25,14 +27,17 @@ def _register_rupee_font():
 
     candidates = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/Library/Fonts/Arial Unicode.ttf",
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
     ]
-    if not os.path.exists(candidates[0]):
+    regular = next((p for p in candidates if os.path.exists(p)), None)
+    if not regular:
         return None  # caller falls back to "Rs."
 
-    pdfmetrics.registerFont(TTFont("DejaVuSans", candidates[0]))
-    if os.path.exists(candidates[1]):
-        pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", candidates[1]))
+    pdfmetrics.registerFont(TTFont("DejaVuSans", regular))
+    bold = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    if os.path.exists(bold):
+        pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", bold))
     return "DejaVuSans"
 
 
@@ -73,7 +78,7 @@ def generate_invoice_pdf(bill_id, owner_id=None, out_dir=None):
         shop_name = prefs.get("shop_name", shop_name)
         gstin = prefs.get("gstin")
 
-    out_dir = out_dir or tempfile.gettempdir()
+    out_dir = out_dir or ARTIFACTS_DIR
     path = os.path.join(out_dir, f"invoice_{bill_id}.pdf")
 
     doc = SimpleDocTemplate(path, pagesize=A4, topMargin=15 * mm, bottomMargin=15 * mm)
@@ -147,7 +152,7 @@ def generate_analysis_pptx(owner_id, period="week", out_dir=None):
     from tools.inventory import low_stock_report
     low_stock = low_stock_report(owner_id)["low_stock"]
 
-    out_dir = out_dir or tempfile.gettempdir()
+    out_dir = out_dir or ARTIFACTS_DIR
 
     # Chart 1: top items by revenue
     chart1_path = os.path.join(out_dir, "chart_top_items.png")

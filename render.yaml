@@ -1,0 +1,19 @@
+services:
+  - type: worker
+    name: kirana-agent-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: KIRANA_DB_PATH
+        value: /data/kirana.db
+    disk:
+      name: kirana-data
+      mountPath: /data
+      sizeGB: 1
