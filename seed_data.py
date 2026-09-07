@@ -1,9 +1,3 @@
-"""
-Seeds the DB with real SKUs and realistic GST slabs:
-- 0%: loose staples (rice, dal, fresh atta by weight)
-- 5%: packaged staples (branded atta, salt, packaged rice)
-- 12-18%: FMCG (soaps, chocolates, some processed foods)
-"""
 
 from db import init_db, get_connection
 

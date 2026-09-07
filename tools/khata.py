@@ -1,9 +1,3 @@
-"""
-Khata (credit ledger) tools. Balance is always derived from the ledger
-(sum of charges minus payments), never stored/mutated directly — this
-avoids drift between a cached balance and the transaction history.
-"""
-
 from db import get_connection, transaction
 from tools.idempotency import check_idempotent, save_idempotent
 

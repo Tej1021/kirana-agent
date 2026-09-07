@@ -1,24 +1,19 @@
-"""
-Telegram wiring. Keeps only the per-chat conversation history in memory —
-everything durable (stock, bills, khata, preferences) lives in SQLite via
-agent.py's tools, so a process restart or a /new chat never loses store
-state, only the current conversation's scrollback.
-"""
-
 import os
 import logging
+import threading
+from fastapi import FastAPI
+import uvicorn
 from dotenv import load_dotenv
 from telegram import InputFile, Update
 from telegram.error import NetworkError, TimedOut
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
 from telegram.request import HTTPXRequest
 
-load_dotenv()  # must run before importing agent (Anthropic client reads env at import)
+load_dotenv() 
 
 from db import init_db
 import agent
 
-# Keep httpx at WARNING so bot tokens aren't printed in request URLs.
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
@@ -99,14 +94,47 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
     logging.error("Unhandled bot error", exc_info=err)
 
 
+health_app = FastAPI()
+
+
+@health_app.get("/")
+async def health():
+    return {"status": "ok", "service": "Kirana Telegram Bot"}
+
+
+def start_health_server():
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run(
+        health_app,
+        host="0.0.0.0",
+        port=port,
+        log_level="warning",
+    )
+
+
 def main():
     init_db()
+
+    # Start HTTP server for Render's health/port check
+    threading.Thread(
+        target=start_health_server,
+        daemon=True,
+    ).start()
+
     token = os.environ["TELEGRAM_BOT_TOKEN"]
 
-    # Longer timeouts help on flaky links to api.telegram.org.
-    request = HTTPXRequest(connect_timeout=30.0, read_timeout=30.0, write_timeout=30.0, pool_timeout=30.0)
+    request = HTTPXRequest(
+        connect_timeout=30.0,
+        read_timeout=30.0,
+        write_timeout=30.0,
+        pool_timeout=30.0,
+    )
+
     get_updates_request = HTTPXRequest(
-        connect_timeout=30.0, read_timeout=60.0, write_timeout=30.0, pool_timeout=30.0
+        connect_timeout=30.0,
+        read_timeout=60.0,
+        write_timeout=30.0,
+        pool_timeout=30.0,
     )
 
     app = (
@@ -116,13 +144,23 @@ def main():
         .get_updates_request(get_updates_request)
         .build()
     )
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("new", new_chat))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            handle_message
+        )
+    )
+
     app.add_error_handler(on_error)
 
     print("Bot running...")
-    app.run_polling(drop_pending_updates=True, bootstrap_retries=-1)
+    app.run_polling(
+        drop_pending_updates=True,
+        bootstrap_retries=-1
+    )
 
 
 if __name__ == "__main__":

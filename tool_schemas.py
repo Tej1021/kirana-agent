@@ -1,14 +1,3 @@
-"""
-Tool definitions in Anthropic Messages API `tools` format. The model sees
-only names, descriptions, and schemas — never the implementation. Keep
-descriptions honest about what each tool refuses to do; that's what lets
-the model relay a refusal in plain language instead of retrying blindly.
-
-Tools whose name appears in MUTATING_TOOLS get an idempotency_key injected
-automatically by agent.py's dispatcher — the model does not need to (and
-should not be relied upon to) supply one.
-"""
-
 MUTATING_TOOLS = {
     "receive_stock", "finalize_bill", "add_khata_charge", "add_khata_payment",
 }

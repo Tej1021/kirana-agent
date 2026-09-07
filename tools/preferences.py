@@ -1,10 +1,3 @@
-"""
-Preferences: standing owner settings (default payment mode, preferred
-brand, shop name/GSTIN for invoices) that persist across chats. Keyed by
-owner_id (the Telegram user id), NOT by chat/conversation id — this is
-what makes them survive a /new chat.
-"""
-
 from db import get_connection
 
 

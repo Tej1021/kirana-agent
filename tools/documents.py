@@ -1,10 +1,3 @@
-"""
-Real artifact generation: a GST-correct PDF invoice from a finalized bill's
-actual DB rows, and a PPTX analysis deck with real matplotlib charts fed by
-analytics.py. Neither is a screenshot or a static template filled with
-placeholder text.
-"""
-
 import os
 
 from db import get_connection

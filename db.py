@@ -1,24 +1,3 @@
-"""
-Database layer for the kirana agent.
-
-Uses SQLite by default (fine for a single-shop deployment and for grading
-this task). Every mutation that touches money or stock runs inside an
-explicit `BEGIN IMMEDIATE` transaction, which takes SQLite's write lock up
-front — this is what makes the atomic oversell-guard UPDATE
-(`WHERE qty >= ?`) safe under concurrent access: SQLite serializes writers,
-so two simultaneous finalize_bill calls can never both see stale stock.
-
---- Swapping to Postgres for multi-owner production use ---
-1. Replace `sqlite3.connect(...)` below with `psycopg2.connect(DATABASE_URL)`.
-2. Replace `?` placeholders with `%s` (or use SQLAlchemy Core, which
-   abstracts this — the query *shapes* below don't need to change).
-3. Replace `BEGIN IMMEDIATE` with `SELECT ... FOR UPDATE` on the specific
-   product/customer row before the conditional UPDATE, since Postgres uses
-   MVCC rather than a single writer lock.
-No business logic changes — the guard pattern (conditional UPDATE + rowcount
-check) is identical on both engines.
-"""
-
 import os
 import sqlite3
 from contextlib import contextmanager
