@@ -1,12 +1,3 @@
-"""
-GST tax engine. Pure functions, no DB, no LLM — this is the piece most
-likely to have a subtle bug, so it's isolated and unit-tested independently
-(see tests/test_tax.py).
-
-Assumes intra-state sales (CGST + SGST split, not IGST) which is the
-default for a single physical kirana store.
-"""
-
 from decimal import Decimal, ROUND_HALF_UP
 
 

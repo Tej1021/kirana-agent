@@ -1,9 +1,3 @@
-"""
-Analytics tools — everything here reads from bill_items / stock_ledger.
-Nothing is hardcoded; the PPTX generator (documents.py) calls these for
-its chart data.
-"""
-
 from db import get_connection
 
 

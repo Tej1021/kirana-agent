@@ -1,9 +1,3 @@
-"""
-CLI chat mode — exercises the exact same agent.py + tools/ + db.py stack
-as bot.py, without needing Telegram. Useful for local testing and for
-verifying the demo script before recording it.
-"""
-
 import os
 import sys
 import uuid

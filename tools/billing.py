@@ -1,10 +1,3 @@
-"""
-Billing tools. A bill is a DB row from the moment start_bill runs, so it
-survives across messages, and even a /new chat (agent.py can resume a
-draft by id if the owner mentions it). Stock is untouched until
-finalize_bill — and finalize_bill is where the atomic oversell guard lives.
-"""
-
 from db import get_connection, transaction
 from tax import compute_tax
 from tools.idempotency import check_idempotent, save_idempotent

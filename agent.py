@@ -1,14 +1,3 @@
-"""
-The agent control loop: observe -> model chooses tool(s) -> execute ->
-feed results back -> continue, until the model stops calling tools.
-
-Two things live here deliberately, not in the model:
-1. Idempotency-key injection for mutating tools (agent.py derives these
-   from the Telegram update, the model never invents them).
-2. Preference injection at the start of every conversation, so standing
-   settings survive a /new chat without living in conversation history.
-"""
-
 import os
 import json
 import anthropic

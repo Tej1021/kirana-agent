@@ -1,8 +1,3 @@
-"""
-Inventory tools. Every price/stock fact the agent ever states must come
-from here — never invented.
-"""
-
 from db import get_connection, transaction
 from tools.idempotency import check_idempotent, save_idempotent
 

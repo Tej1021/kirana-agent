@@ -5,6 +5,14 @@ cutting GST-correct bills, khata (credit) management, daily close, PDF
 invoices, and PPTX analysis decks — all through plain-language Telegram
 messages. No admin panel. The chat is the product.
 
+## Live Bot
+
+Telegram Bot Username: @KiranaMate_bot
+
+## Video Link
+
+
+
 ## Harness
 
 Built directly on the **Claude Messages API tool-use loop** (the `anthropic`
