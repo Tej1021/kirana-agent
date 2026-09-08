@@ -3,7 +3,7 @@ import sys
 import uuid
 from dotenv import load_dotenv
 
-load_dotenv()  # must run before importing agent (Anthropic client reads env at import)
+load_dotenv()  # must run before importing agent (agent reads LLM_PROVIDER/model env at import)
 
 from db import init_db
 import agent
