@@ -9,9 +9,24 @@ messages. No admin panel. The chat is the product.
 
 Telegram Bot Username: @KiranaMate_bot
 
-## Video Link
+## Live Demo Video
 
 https://drive.google.com/file/d/1IuwO5Ng6iYKNZVGjO0KwXwdfSmzbH5Bx/view?usp=sharing
+The video below demonstrates the live Telegram bot and its interaction flow.
+
+**Video:**  
+https://drive.google.com/file/d/1IuwO5Ng6iYKNZVGjO0KwXwdfSmzbH5Bx/view?usp=sharing)
+
+> **Note:** The Anthropic API credits associated with the API key used for the demonstration have been exhausted due to usage during development and testing. I am currently working on replacing the API key so that the live bot can be fully tested again. The video demonstrates the bot's functionality before the API credits were exhausted.
+
+## Generated Artifacts
+
+The bot generates real business artifacts directly from the underlying store data.
+
+- **PDF Invoice:** Refer to the submitted PDF artifact for the generated GST invoice.
+- **PPTX Analysis:** Refer to the submitted PowerPoint artifact for the generated store analysis deck.
+
+The PDF and PPTX are generated dynamically by the document-generation tools described in the **Real artifacts** section below.
 
 
 ## Harness
