@@ -11,13 +11,32 @@ Telegram Bot Username: @KiranaMate_bot
 
 ## Live Demo Video
 
+The following videos demonstrate the Telegram bot and its interaction flow,
+including store operations, billing, inventory management, and generated
+business artifacts.
+
+### Initial Demo — Anthropic Claude API
+
+The initial version of the project was developed and demonstrated using the
+Anthropic Claude API.
+
+**Video:** 
 https://drive.google.com/file/d/1IuwO5Ng6iYKNZVGjO0KwXwdfSmzbH5Bx/view?usp=sharing
-The video below demonstrates the live Telegram bot and its interaction flow.
 
-**Video:**  
-https://drive.google.com/file/d/1IuwO5Ng6iYKNZVGjO0KwXwdfSmzbH5Bx/view?usp=sharing)
+> **Note:** The Anthropic API credits associated with the API key used for
+> this demonstration were exhausted during development and testing.
 
-> **Note:** The Anthropic API credits associated with the API key used for the demonstration have been exhausted due to usage during development and testing. I am currently working on replacing the API key so that the live bot can be fully tested again. The video demonstrates the bot's functionality before the API credits were exhausted.
+### Updated Demo — OpenAI API
+
+After the Anthropic API credits were exhausted, the agent was migrated from
+Anthropic Claude to the OpenAI API. The following video demonstrates the
+updated version running with the OpenAI API key.
+
+**New Video — OpenAI API:**  
+https://drive.google.com/file/d/1COqhdoo_RK5RdWI4uteI49_cD2tj94lH/view?usp=sharing
+
+> **Note:** This is the latest demonstration of the project after migrating
+> the AI provider from Anthropic to OpenAI.
 
 ## Generated Artifacts
 
@@ -31,32 +50,38 @@ The PDF and PPTX are generated dynamically by the document-generation tools desc
 
 ## Harness
 
-Built directly on the **Claude Messages API tool-use loop** (the `anthropic`
-Python SDK), rather than the higher-level Claude Agent SDK package. This is
-a deliberate choice, not a shortcut:
+Initially developed using the **Claude Messages API** with the `anthropic`
+Python SDK, rather than the higher-level Claude Agent SDK package. This was
+a deliberate choice to maintain direct control over the agent's tool-use
+loop, idempotency handling, and guardrail confirmations.
 
-- The core control loop Agent SDK provides — observe → let the model choose
-  tools → execute → feed results back → repeat until `end_turn` — is about
-  40 lines of code on top of `messages.create(..., tools=[...])`. Writing it
-  directly means zero dependency on an SDK whose surface is still moving
-  fast, and full control over exactly where idempotency keys and guardrail
-  confirmations get injected (see below) — which is where this task is
-  actually won or lost.
-- Every tool is a plain Python function with a JSON Schema `input_schema`.
-  The model never sees business logic — it sees a menu of thin, named
-  capabilities and decides which to call and in what order, chaining calls
-  within a turn as needed. Nothing here is a regex/keyword router.
+During development and testing, the Anthropic API credits associated with the
+initial implementation were exhausted. The agent was subsequently migrated
+to the **OpenAI API**, while preserving the same underlying tool architecture,
+business logic, database layer, idempotency mechanisms, and guardrails.
 
-If you'd rather grade this against the actual Agent SDK, `agent.py` is a
-drop-in replacement point — swap `run_turn()`'s internals for
-`ClaudeSDKClient` and the tool functions/schemas are unchanged.
+The current implementation uses the **OpenAI API tool-use loop** directly
+rather than a higher-level agent framework:
+
+- The core control loop follows the same pattern — observe → let the model
+  choose tools → execute → feed results back → repeat until the model
+  completes the turn. Implementing this loop directly provides full control
+  over exactly where idempotency keys and guardrail confirmations are
+  injected.
+- Every tool is a plain Python function with a JSON Schema describing its
+  inputs. The model never sees the underlying business logic — it sees a
+  menu of thin, named capabilities and decides which tools to call and in
+  what order, chaining calls within a turn as needed. Nothing here is a
+  regex/keyword router.
+- The migration from Anthropic to OpenAI affected the model/API layer while
+  leaving the tool interfaces and core business logic unchanged.
 
 ## Architecture
 
 ```
 Telegram update ─▶ bot.py ─▶ agent.py (control loop) ─▶ tools/*.py ─▶ SQLite
                                   │
-                                  └─▶ Anthropic Messages API (tool_use loop)
+                                  └─▶ OpenAI Messages API (tool_use loop)
 ```
 
 - **Persistence**: SQLite (`kirana.db`), WAL mode, explicit `BEGIN IMMEDIATE`
@@ -142,8 +167,7 @@ before the first model call. Nothing about memory lives in context history.
 
 ```bash
 pip install -r requirements.txt --break-system-packages
-python seed_data.py              
-python main.py                   
+python seed_data.py
 python bot.py
 ```
 
