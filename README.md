@@ -11,6 +11,7 @@ Telegram Bot Username: @KiranaMate_bot
 
 ## Video Link
 
+https://drive.google.com/file/d/1IuwO5Ng6iYKNZVGjO0KwXwdfSmzbH5Bx/view?usp=sharing
 
 
 ## Harness
@@ -131,12 +132,7 @@ python main.py
 python bot.py
 ```
 
-Run the hard-parts test suite (no API key needed — these test the tool
-layer directly):
 
-```bash
-python -m pytest tests/ -v
-```
 
 
 

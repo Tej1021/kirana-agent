@@ -11,6 +11,12 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: LLM_PROVIDER
+        value: gpt
+      - key: GPT_MODEL
+        value: gpt-5
       - key: KIRANA_DB_PATH
         value: /data/kirana.db
     disk:

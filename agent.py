@@ -1,13 +1,41 @@
 import os
 import json
-import anthropic
 
 from tool_schemas import TOOLS, MUTATING_TOOLS
 from tools import inventory, billing, khata, analytics, documents, preferences as prefs_module
 
-MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6")
+# Which LLM backend this process talks to: "claude" (Anthropic) or "gpt" (OpenAI).
+# Set LLM_PROVIDER in .env. One conversation must stay on one provider — the two
+# use different message formats, so history is not portable between them.
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "claude").strip().lower()
 
-client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
+CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-4-6")
+GPT_MODEL = os.environ.get("GPT_MODEL", "gpt-5")
+
+MODEL = CLAUDE_MODEL  # backwards-compatible alias
+
+_claude_client = None
+_gpt_client_instance = None
+
+
+def claude_client():
+    """Anthropic client, built on first use so a GPT-only setup needs no ANTHROPIC_API_KEY."""
+    global _claude_client
+    if _claude_client is None:
+        import anthropic
+
+        _claude_client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
+    return _claude_client
+
+
+def gpt_client():
+    """OpenAI client, built on first use so a Claude-only setup needs no OPENAI_API_KEY."""
+    global _gpt_client_instance
+    if _gpt_client_instance is None:
+        import openai
+
+        _gpt_client_instance = openai.OpenAI()  # reads OPENAI_API_KEY from env
+    return _gpt_client_instance
 
 SYSTEM_PROMPT_TEMPLATE = """You run a small Indian kirana (grocery) store on behalf of its owner, \
 entirely through this chat. Prices are in INR (₹).
@@ -116,23 +144,15 @@ def with_language_hint(user_message):
     )
 
 
-def run_turn(owner_id, user_message, history, idempotency_seed):
-    """
-    owner_id: stable identity for the shop owner (Telegram user id)
-    user_message: plain text from the owner
-    history: list of prior {"role", "content"} messages for THIS conversation
-             (cleared on /new — persistence of facts happens via the DB, not this list)
-    idempotency_seed: unique per incoming update (e.g. f"tg-{update_id}"), used to
-             derive idempotency keys for any mutating tool calls this turn triggers
-    Returns (final_text, updated_history, generated_files)
-    """
+def run_turn_claude(owner_id, user_message, history, idempotency_seed):
+    """Anthropic (Claude) implementation of run_turn. History is in Anthropic format."""
     system_prompt = build_system_prompt(owner_id)
     messages = history + [{"role": "user", "content": with_language_hint(user_message)}]
     generated_files = []
 
     while True:
-        response = client.messages.create(
-            model=MODEL,
+        response = claude_client().messages.create(
+            model=CLAUDE_MODEL,
             max_tokens=1024,
             system=system_prompt,
             tools=TOOLS,
@@ -163,3 +183,80 @@ def run_turn(owner_id, user_message, history, idempotency_seed):
             })
 
         messages.append({"role": "user", "content": tool_results})
+
+
+def _openai_tools():
+    """TOOLS is written in Anthropic shape; OpenAI wants each one wrapped as a function."""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": tool["name"],
+                "description": tool.get("description", ""),
+                "parameters": tool["input_schema"],
+            },
+        }
+        for tool in TOOLS
+    ]
+
+
+OPENAI_TOOLS = _openai_tools()
+
+
+def run_turn_gpt(owner_id, user_message, history, idempotency_seed):
+    """OpenAI (GPT) implementation of run_turn. History is in OpenAI chat format."""
+    system_prompt = build_system_prompt(owner_id)
+    messages = history + [{"role": "user", "content": with_language_hint(user_message)}]
+    generated_files = []
+
+    while True:
+        response = gpt_client().chat.completions.create(
+            model=GPT_MODEL,
+            max_completion_tokens=1024,
+            tools=OPENAI_TOOLS,
+            messages=[{"role": "system", "content": system_prompt}] + messages,
+        )
+        message = response.choices[0].message
+        messages.append(message.model_dump(exclude_none=True))
+
+        if not message.tool_calls:
+            return (message.content or ""), messages, generated_files
+
+        for call in message.tool_calls:
+            try:
+                tool_input = json.loads(call.function.arguments or "{}")
+            except json.JSONDecodeError as e:
+                result = {"ok": False, "error": f"Bad arguments for {call.function.name}: {e}"}
+            else:
+                result = dispatch_tool(call.function.name, tool_input, owner_id, idempotency_seed)
+            if isinstance(result, dict) and result.get("ok") and result.get("path"):
+                path = result["path"]
+                if os.path.exists(path):
+                    generated_files.append(path)
+            messages.append({
+                "role": "tool",
+                "tool_call_id": call.id,
+                "content": json.dumps(result, default=str),
+            })
+
+
+def run_turn(owner_id, user_message, history, idempotency_seed):
+    """
+    owner_id: stable identity for the shop owner (Telegram user id)
+    user_message: plain text from the owner
+    history: list of prior messages for THIS conversation, in the format of the
+             active provider (cleared on /new — persistence of facts happens via
+             the DB, not this list)
+    idempotency_seed: unique per incoming update (e.g. f"tg-{update_id}"), used to
+             derive idempotency keys for any mutating tool calls this turn triggers
+    Returns (final_text, updated_history, generated_files)
+
+    Routes to Claude or GPT based on LLM_PROVIDER.
+    """
+    if LLM_PROVIDER == "claude":
+        return run_turn_claude(owner_id, user_message, history, idempotency_seed)
+    if LLM_PROVIDER == "gpt":
+        return run_turn_gpt(owner_id, user_message, history, idempotency_seed)
+    raise ValueError(
+        f"Unknown LLM_PROVIDER {LLM_PROVIDER!r} — expected 'claude' or 'gpt'."
+    )
